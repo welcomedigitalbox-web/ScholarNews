@@ -39,14 +39,15 @@ export default function SiteRouter() {
   const [saved, setSaved] = useLocalState<string[]>("sm-saved", []);
   const [tracked, setTracked] = useLocalState<TrackedApplication[]>("sm-tracked", []);
   const [user, setUser] = useState<User | null>(null);
-  const [catalog, setCatalog] = useState<Scholarship[]>(scholarships);
+ const [catalog, setCatalog] = useState<Scholarship[]>([]);
   useEffect(() => auth ? onAuthStateChanged(auth, setUser) : undefined, []);
   useEffect(() => {
     if (!db) return;
     return onSnapshot(query(collection(db, "scholarships"),where("published","==",true)), snapshot => {
       const remote = snapshot.docs.map(entry => ({ id: entry.id, ...entry.data() }) as Scholarship);
-      const remoteIds = new Set(remote.map(item => item.id));
-      setCatalog([...remote.filter(item => item.published !== false), ...scholarships.filter(item => !remoteIds.has(item.id))]);
+setCatalog(
+  remote.filter(item => item.published === true)
+);
     });
   }, []);
   const toggleSaved = (id: string) => setSaved(saved.includes(id) ? saved.filter(x => x !== id) : [...saved, id]);
