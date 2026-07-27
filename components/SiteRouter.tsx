@@ -158,7 +158,41 @@ function AdminPage({ user }: { user: User | null }) {
   const remove=async(item:Scholarship)=>{if(!db||!window.confirm(`Delete “${item.name}”?`))return; await deleteDoc(doc(db,"scholarships",item.id)); setNotice("Scholarship deleted.");};
   const togglePublish=async(item:Scholarship)=>{if(!db)return; await setDoc(doc(db,"scholarships",item.id),{published:!item.published,verifiedAt:new Date().toISOString()},{merge:true});};
   const syncApi=async()=>{const syncKey=window.prompt("Enter the admin sync key");if(!syncKey)return;setSyncing(true);setNotice("");try{const response=await fetch("/api/scholarships/import",{method:"POST",headers:{"x-admin-sync-key":syncKey}});const data=await response.json() as {items?:Scholarship[];error?:string};if(!response.ok)throw new Error(data.error||"API sync failed");const imports=data.items||[];for(const item of imports){if(db)await setDoc(doc(db,"scholarships",item.id),item,{merge:true});}setNotice(`${imports.length} scholarships imported as drafts for review.`);}catch(error){setNotice(error instanceof Error?error.message:"Unable to sync API.");}finally{setSyncing(false);}};
+const seedSampleScholarships = async () => {
+  if (!db) {
+    setNotice("Firebase is not configured.");
+    return;
+  }
 
+  try {
+    setNotice("Adding sample scholarships...");
+
+    const verifiedAt = new Date().toISOString();
+
+    for (const scholarship of scholarships) {
+      await setDoc(
+        doc(db, "scholarships", scholarship.id),
+        {
+          ...scholarship,
+          published: true,
+          source: "sample",
+          verifiedAt,
+        },
+        { merge: true }
+      );
+    }
+
+    setNotice(
+      `${scholarships.length} sample scholarships added to Firestore.`
+    );
+  } catch (error) {
+    setNotice(
+      error instanceof Error
+        ? error.message
+        : "Unable to add sample scholarships."
+    );
+  }
+};
   return <><Header/><div className="bg-slate-950 text-white"><div className="mx-auto flex max-w-7xl flex-col justify-between gap-5 px-5 py-10 sm:flex-row sm:items-center lg:px-8"><div><p className="text-sm font-bold uppercase tracking-widest text-teal-300">Secure admin workspace</p><h1 className="mt-2 text-3xl font-extrabold">Scholarship management</h1><p className="mt-2 text-sm text-slate-400">Signed in as {user?.email}</p></div><div className="flex flex-wrap gap-3"><button className="btn-secondary" onClick={syncApi} disabled={syncing}><CloudDownload size={17}/>{syncing?"Syncing…":"Import from API"}</button><button className="btn-primary" onClick={()=>setEditing(blank)}>+ Add scholarship</button><button className="px-3 text-sm font-bold text-slate-300" onClick={async()=>{if(auth)await signOut(auth);window.location.href="/admin-login"}}>Sign out</button></div></div></div><main className="section bg-slate-50"><div className="section-inner">{notice&&<div className="mb-5 rounded-2xl border border-teal-200 bg-teal-50 p-4 font-semibold text-teal-800">{notice}</div>}<div className="mb-5 grid gap-4 sm:grid-cols-3"><AdminMetric label="Total records" value={items.length}/><AdminMetric label="Published" value={items.filter(x=>x.published).length}/><AdminMetric label="API drafts" value={items.filter(x=>x.source==="api"&&!x.published).length}/></div><div className="card overflow-x-auto"><div className="min-w-[820px]"><div className="grid grid-cols-[1.5fr_.55fr_.55fr_.8fr] bg-slate-50 px-5 py-3 text-xs font-bold uppercase tracking-wider text-slate-400"><span>Scholarship</span><span>Source</span><span>Status</span><span>Actions</span></div>{items.map(s=><div key={s.id} className="grid grid-cols-[1.5fr_.55fr_.55fr_.8fr] items-center border-t border-slate-100 px-5 py-4"><div><p className="font-bold text-slate-900">{s.name}</p><p className="mt-1 text-sm text-slate-500">{s.university} · {s.country} · {s.deadline}</p></div><span className="text-sm font-semibold capitalize text-slate-500">{s.source||"manual"}</span><span className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${s.published?"bg-teal-50 text-teal-700":"bg-amber-50 text-amber-700"}`}>{s.published?"Published":"Draft"}</span><div className="flex gap-3 text-sm font-bold"><button onClick={()=>setEditing(s)} className="text-teal-700">Edit</button><button onClick={()=>togglePublish(s)} className="text-slate-600">{s.published?"Unpublish":"Publish"}</button><button onClick={()=>remove(s)} className="text-red-600">Delete</button></div></div>)}{!items.length&&<p className="p-8 text-center text-slate-500">No Firestore scholarships yet. Add one manually or import from the API.</p>}</div></div></div></main>{editing&&<ScholarshipEditor item={editing} setItem={setEditing} close={()=>setEditing(null)} save={save}/>}<Footer/></>;
 }
 
